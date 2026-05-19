@@ -3,7 +3,6 @@ import numpy as np
 from scipy.stats import norm
 from .base import StochasticModel, SimulationSpec, FloatArray
 
-
 class GeometricBrownianMotion(StochasticModel):
     """Geometric Brownian Motion (GBM) implementation."""
 
@@ -25,24 +24,39 @@ class GeometricBrownianMotion(StochasticModel):
         return sigma * state
 
     def simulate(self, spec: SimulationSpec) -> FloatArray:
-        """Python-based simulation using the exact solution of the SDE."""
-        rng = self.rng(spec.seed)
+        """Simulate asset paths using either the fast C++ core or Python fallback."""
+        try:
+            # Try to import the native C++ compiled engine
+            from itocore import _core
 
-        # Alocăm memoria: (paths, steps + 1)
-        paths = np.zeros((spec.paths, spec.steps + 1))
-        paths[:, 0] = spec.spot
+            # Pre-allocate a contiguous NumPy array for C++ zero-copy mapping
+            paths = np.empty((spec.paths, spec.steps + 1), dtype=np.float64)
 
-        r = self.parameters.get("rate", 0.0)
-        sigma = self.parameters.get("vol", 0.2)
-        dt = spec.dt
+            # Extract parameters
+            mu = self.parameters.get("rate", 0.0)
+            sigma = self.parameters.get("vol", 0.2)
+            seed_val = spec.seed if spec.seed is not None else 42
 
-        for i in range(1, spec.steps + 1):
-            z = rng.standard_normal(spec.paths)
-            paths[:, i] = paths[:, i - 1] * np.exp(
-                (r - 0.5 * sigma ** 2) * dt + sigma * np.sqrt(dt) * z
-            )
+            # Execute calculation natively in C++
+            _core.simulate_gbm(paths, spec.spot, mu, sigma, spec.dt, seed_val)
+            return paths
 
-        return paths
+        except ImportError:
+            # Fallback to standard Python/NumPy implementation if binary is not compiled
+            rng = self.rng(spec.seed)
+            paths = np.zeros((spec.paths, spec.steps + 1))
+
+            r = self.parameters.get("rate", 0.0)
+            sigma = self.parameters.get("vol", 0.2)
+            dt = spec.dt
+
+            for i in range(1, spec.steps + 1):
+                z = rng.standard_normal(spec.paths)
+                paths[:, i] = paths[:, i-1] * np.exp(
+                    (r - 0.5 * sigma**2) * dt + sigma * np.sqrt(dt) * z
+                )
+
+            return paths
 
     def price_vanilla(
             self,
