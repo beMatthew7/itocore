@@ -45,6 +45,7 @@ class GeometricBrownianMotion(StochasticModel):
             # Fallback to standard Python/NumPy implementation if binary is not compiled
             rng = self.rng(spec.seed)
             paths = np.zeros((spec.paths, spec.steps + 1))
+            paths[:, 0] = spec.spot
 
             r = self.parameters.get("rate", 0.0)
             sigma = self.parameters.get("vol", 0.2)

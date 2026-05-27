@@ -59,6 +59,36 @@ def test_cir_simulation_non_negative():
     assert np.all(paths >= 0.0), "Found negative values in CIR simulation paths"
 
 
+def test_cir_simulation_shape_initial_value_and_determinism():
+    """Test CIR output shape, initial value preservation, and fixed-seed determinism."""
+    cir = CoxIngersollRoss(speed=1.2, mean=0.03, vol=0.35)
+
+    spec = SimulationSpec(
+        spot=0.02,
+        maturity=1.0,
+        steps=64,
+        paths=32,
+        seed=7,
+    )
+
+    paths1 = cir.simulate(spec)
+    paths2 = cir.simulate(spec)
+
+    assert paths1.shape == (32, 65)
+    assert paths2.shape == (32, 65)
+    np.testing.assert_array_equal(paths1[:, 0], 0.02)
+    np.testing.assert_array_equal(paths1, paths2)
+
+
+def test_cir_drift_and_diffusion_terms():
+    """Test CIR instantaneous coefficients match the mathematical process definition."""
+    cir = CoxIngersollRoss(speed=0.5, mean=0.04, vol=0.2)
+    state = np.array([0.01, 0.04, 0.09], dtype=np.float64)
+
+    np.testing.assert_allclose(cir.drift(state, 0.0), np.array([0.015, 0.0, -0.025]))
+    np.testing.assert_allclose(cir.diffusion(state, 0.0), 0.2 * np.sqrt(state))
+
+
 def test_invalid_parameters():
     """Test that validate_parameters catches invalid model configurations."""
     # Test GBM with invalid volatility
