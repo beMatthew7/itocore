@@ -26,8 +26,8 @@ class SimulationSpec:
         return self.maturity / self.steps
 
     def __post_init__(self) -> None:
-        if self.spot <= 0.0:
-            raise ValueError("spot must be positive")
+        if not np.isfinite(self.spot):
+            raise ValueError("spot must be finite")
         if self.maturity <= 0.0:
             raise ValueError("maturity must be positive")
         if self.steps <= 0:

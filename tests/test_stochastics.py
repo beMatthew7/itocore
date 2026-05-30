@@ -1,6 +1,12 @@
-import pytest
 import numpy as np
-from itocore.stochastics import GeometricBrownianMotion, CoxIngersollRoss, SimulationSpec
+import pytest
+
+from itocore.stochastics import (
+    CoxIngersollRoss,
+    GeometricBrownianMotion,
+    SimulationSpec,
+    VasicekModel,
+)
 
 
 def test_gbm_simulation_shape_and_determinism():
@@ -89,6 +95,47 @@ def test_cir_drift_and_diffusion_terms():
     np.testing.assert_allclose(cir.diffusion(state, 0.0), 0.2 * np.sqrt(state))
 
 
+def test_vasicek_simulation_shape_initial_value_and_determinism():
+    """Test Vasicek output shape, negative-rate support, and fixed-seed determinism."""
+    vasicek = VasicekModel(speed=0.7, mean=0.02, vol=0.03)
+
+    spec = SimulationSpec(
+        spot=-0.005,
+        maturity=1.5,
+        steps=96,
+        paths=40,
+        seed=99,
+    )
+
+    paths1 = vasicek.simulate(spec)
+    paths2 = vasicek.simulate(spec)
+
+    assert paths1.shape == (40, 97)
+    assert paths2.shape == (40, 97)
+    np.testing.assert_array_equal(paths1[:, 0], -0.005)
+    np.testing.assert_array_equal(paths1, paths2)
+    assert np.any(paths1 < 0.0)
+
+
+def test_vasicek_drift_and_diffusion_terms():
+    """Test Vasicek instantaneous coefficients match the mathematical process definition."""
+    vasicek = VasicekModel(speed=0.5, mean=0.04, vol=0.2)
+    state = np.array([-0.01, 0.04, 0.09], dtype=np.float64)
+
+    np.testing.assert_allclose(vasicek.drift(state, 0.0), np.array([0.025, 0.0, -0.025]))
+    np.testing.assert_allclose(vasicek.diffusion(state, 0.0), np.full(3, 0.2))
+
+
+def test_vasicek_zero_coupon_bond_price_is_positive():
+    """Test Vasicek analytical zero-coupon bond pricing produces finite positive prices."""
+    vasicek = VasicekModel(speed=0.8, mean=0.03, vol=0.015)
+
+    price = vasicek.zero_coupon_bond_price(short_rate=0.025, maturity=5.0)
+
+    assert np.isfinite(price)
+    assert price > 0.0
+
+
 def test_invalid_parameters():
     """Test that validate_parameters catches invalid model configurations."""
     # Test GBM with invalid volatility
@@ -118,3 +165,21 @@ def test_invalid_parameters():
 
     with pytest.raises(ValueError, match="CIR requires a positive 'vol'"):
         CoxIngersollRoss(speed=0.5, mean=0.04, vol=0.0)
+
+    # Test Vasicek with invalid speed
+    with pytest.raises(ValueError, match="Vasicek requires a positive 'speed'"):
+        VasicekModel(speed=-0.1, mean=0.04, vol=0.15)
+
+    with pytest.raises(ValueError, match="Vasicek requires a positive 'speed'"):
+        VasicekModel(speed=0.0, mean=0.04, vol=0.15)
+
+    # Test Vasicek with invalid mean
+    with pytest.raises(ValueError, match="Vasicek requires a finite 'mean'"):
+        VasicekModel(speed=0.5, mean=np.nan, vol=0.15)
+
+    # Test Vasicek with invalid vol
+    with pytest.raises(ValueError, match="Vasicek requires a positive 'vol'"):
+        VasicekModel(speed=0.5, mean=0.04, vol=-0.1)
+
+    with pytest.raises(ValueError, match="Vasicek requires a positive 'vol'"):
+        VasicekModel(speed=0.5, mean=0.04, vol=0.0)
