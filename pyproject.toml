@@ -8,10 +8,55 @@ version = "0.1.0"
 description = "High-performance quantitative finance library"
 readme = "README.md"
 requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Matei-Calin Botezat" }
+]
+keywords = [
+    "quantitative-finance",
+    "monte-carlo",
+    "stochastic-processes",
+    "options-pricing",
+    "pybind11",
+    "cpp",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: C++",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Office/Business :: Financial",
+    "Topic :: Scientific/Engineering :: Mathematics",
+]
 dependencies = [
     "numpy>=1.24",
     "scipy>=1.10"
 ]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8.0",
+]
+build = [
+    "build>=1.2",
+    "twine>=5.0",
+]
+dev = [
+    "build>=1.2",
+    "pytest>=8.0",
+    "twine>=5.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/beMatthew7/itocore"
+Repository = "https://github.com/beMatthew7/itocore"
+Issues = "https://github.com/beMatthew7/itocore/issues"
 
 [tool.scikit-build]
 wheel.packages = ["src/itocore"]
