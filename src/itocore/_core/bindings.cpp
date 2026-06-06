@@ -5,6 +5,7 @@
 #include "monte_carlo.hpp"
 #include "cir.hpp"
 #include "vasicek.hpp"
+#include "ou.hpp"
 
 namespace py = pybind11;
 
@@ -72,6 +73,26 @@ void simulate_vasicek(py::array_t<double, py::array::c_style | py::array::forcec
                          n_paths, n_steps, r0, a, b, sigma, dt, seed);
 }
 
+void simulate_ou(py::array_t<double, py::array::c_style | py::array::forcecast> output,
+                 double x0, double speed, double mean, double vol, double dt, uint64_t seed) {
+
+    if (output.ndim() != 2) {
+        throw std::runtime_error("Output array must be 2-dimensional (n_paths, n_steps+1)");
+    }
+
+    auto buffer = output.request();
+    size_t n_paths = buffer.shape[0];
+    size_t n_steps_plus_one = buffer.shape[1];
+
+    if (n_steps_plus_one < 2) {
+        throw std::runtime_error("Number of steps must be at least 1");
+    }
+    size_t n_steps = n_steps_plus_one - 1;
+
+    simulate_ou_cpp(static_cast<double*>(buffer.ptr),
+                    n_paths, n_steps, x0, speed, mean, vol, dt, seed);
+}
+
 // Generate the native binary module named '_core' accessible via Python imports
 PYBIND11_MODULE(_core, m) {
     m.doc() = "ItoCore native high-performance computational engine";
@@ -99,6 +120,15 @@ PYBIND11_MODULE(_core, m) {
           py::arg("a"),
           py::arg("b"),
           py::arg("sigma"),
+          py::arg("dt"),
+          py::arg("seed"));
+
+    m.def("simulate_ou", &simulate_ou,
+          py::arg("output"),
+          py::arg("x0"),
+          py::arg("speed"),
+          py::arg("mean"),
+          py::arg("vol"),
           py::arg("dt"),
           py::arg("seed"));
 }

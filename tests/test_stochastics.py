@@ -4,6 +4,7 @@ import pytest
 from itocore.stochastics import (
     CoxIngersollRoss,
     GeometricBrownianMotion,
+    OrnsteinUhlenbeckProcess,
     SimulationSpec,
     VasicekModel,
 )
@@ -136,6 +137,58 @@ def test_vasicek_zero_coupon_bond_price_is_positive():
     assert price > 0.0
 
 
+def test_ou_simulation_shape_initial_value_and_determinism():
+    """Test OU output shape, spread support, and fixed-seed determinism."""
+    ou = OrnsteinUhlenbeckProcess(speed=1.5, mean=0.0, vol=0.8)
+
+    spec = SimulationSpec(
+        spot=2.0,
+        maturity=2.0,
+        steps=128,
+        paths=48,
+        seed=202,
+    )
+
+    paths1 = ou.simulate(spec)
+    paths2 = ou.simulate(spec)
+
+    assert paths1.shape == (48, 129)
+    assert paths2.shape == (48, 129)
+    np.testing.assert_array_equal(paths1[:, 0], 2.0)
+    np.testing.assert_array_equal(paths1, paths2)
+    assert np.any(paths1 < 0.0)
+
+
+def test_ou_drift_and_diffusion_terms():
+    """Test OU instantaneous coefficients match the mathematical process definition."""
+    ou = OrnsteinUhlenbeckProcess(speed=0.25, mean=1.0, vol=0.4)
+    state = np.array([-1.0, 1.0, 3.0], dtype=np.float64)
+
+    np.testing.assert_allclose(ou.drift(state, 0.0), np.array([0.5, 0.0, -0.5]))
+    np.testing.assert_allclose(ou.diffusion(state, 0.0), np.full(3, 0.4))
+
+
+def test_ou_half_life_and_stationary_variance():
+    """Test OU statistical helper methods."""
+    ou = OrnsteinUhlenbeckProcess(speed=0.5, mean=0.0, vol=0.2)
+
+    np.testing.assert_allclose(ou.half_life(), np.log(2.0) / 0.5)
+    np.testing.assert_allclose(ou.stationary_variance(), 0.2**2 / (2.0 * 0.5))
+
+
+def test_ou_vanilla_option_price_is_finite_and_positive():
+    """Test OU Gaussian terminal-value option pricing."""
+    ou = OrnsteinUhlenbeckProcess(speed=1.0, mean=0.0, vol=0.5)
+
+    call = ou.price_vanilla(spot=0.2, strike=0.0, maturity=1.0, rate=0.03, option_type="call")
+    put = ou.price_vanilla(spot=0.2, strike=0.0, maturity=1.0, rate=0.03, option_type="put")
+
+    assert np.isfinite(call)
+    assert np.isfinite(put)
+    assert call > 0.0
+    assert put > 0.0
+
+
 def test_invalid_parameters():
     """Test that validate_parameters catches invalid model configurations."""
     # Test GBM with invalid volatility
@@ -183,3 +236,21 @@ def test_invalid_parameters():
 
     with pytest.raises(ValueError, match="Vasicek requires a positive 'vol'"):
         VasicekModel(speed=0.5, mean=0.04, vol=0.0)
+
+    # Test OU with invalid speed
+    with pytest.raises(ValueError, match="OU requires a positive 'speed'"):
+        OrnsteinUhlenbeckProcess(speed=-0.1, mean=0.0, vol=1.0)
+
+    with pytest.raises(ValueError, match="OU requires a positive 'speed'"):
+        OrnsteinUhlenbeckProcess(speed=0.0, mean=0.0, vol=1.0)
+
+    # Test OU with invalid mean
+    with pytest.raises(ValueError, match="OU requires a finite 'mean'"):
+        OrnsteinUhlenbeckProcess(speed=0.5, mean=np.nan, vol=1.0)
+
+    # Test OU with invalid vol
+    with pytest.raises(ValueError, match="OU requires a positive 'vol'"):
+        OrnsteinUhlenbeckProcess(speed=0.5, mean=0.0, vol=-1.0)
+
+    with pytest.raises(ValueError, match="OU requires a positive 'vol'"):
+        OrnsteinUhlenbeckProcess(speed=0.5, mean=0.0, vol=0.0)
