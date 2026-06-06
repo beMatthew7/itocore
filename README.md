@@ -11,4 +11,5 @@ High-performance quantitative finance library in Python (and C++)
 ## Pricing
 
 - European vanilla option pricing by Monte Carlo
+- Arithmetic Asian option pricing by Monte Carlo
 - Black-Scholes analytical pricing for GBM validation

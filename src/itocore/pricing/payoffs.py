@@ -17,3 +17,8 @@ def vanilla_payoff(terminal_values: FloatArray, strike: float, option_type: str 
         return np.maximum(strike - terminal_values, 0.0)
 
     raise ValueError("option_type must be either 'call' or 'put'")
+
+
+def asian_payoff(path_averages: FloatArray, strike: float, option_type: str = "call") -> FloatArray:
+    """Return arithmetic Asian option payoffs from per-path average underlying values."""
+    return vanilla_payoff(path_averages, strike, option_type)

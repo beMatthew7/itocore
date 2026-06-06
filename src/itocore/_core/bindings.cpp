@@ -122,6 +122,36 @@ py::tuple price_vanilla_terminal(
     return py::make_tuple(result.price, result.standard_error);
 }
 
+py::tuple price_asian_arithmetic(
+    py::array_t<double, py::array::c_style | py::array::forcecast> paths,
+    double strike,
+    double rate,
+    double maturity,
+    const std::string& option_type,
+    bool include_initial
+) {
+    if (paths.ndim() != 2) {
+        throw std::runtime_error("paths array must be 2-dimensional (n_paths, n_steps+1)");
+    }
+
+    auto buffer = paths.request();
+    const size_t n_paths = buffer.shape[0];
+    const size_t n_steps_plus_one = buffer.shape[1];
+
+    const auto result = price_asian_arithmetic_cpp(
+        static_cast<const double*>(buffer.ptr),
+        n_paths,
+        n_steps_plus_one,
+        strike,
+        rate,
+        maturity,
+        option_type,
+        include_initial
+    );
+
+    return py::make_tuple(result.price, result.standard_error);
+}
+
 // Generate the native binary module named '_core' accessible via Python imports
 PYBIND11_MODULE(_core, m) {
     m.doc() = "ItoCore native high-performance computational engine";
@@ -167,4 +197,12 @@ PYBIND11_MODULE(_core, m) {
           py::arg("rate"),
           py::arg("maturity"),
           py::arg("option_type"));
+
+    m.def("price_asian_arithmetic", &price_asian_arithmetic,
+          py::arg("paths"),
+          py::arg("strike"),
+          py::arg("rate"),
+          py::arg("maturity"),
+          py::arg("option_type"),
+          py::arg("include_initial"));
 }
